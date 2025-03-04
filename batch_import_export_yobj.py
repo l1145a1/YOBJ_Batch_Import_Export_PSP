@@ -6,9 +6,6 @@ import math
 from collections import OrderedDict
 from obj_loader import OBJ
 
-# Implementasi hex_file class
-import struct
-
 class hex_file:
     def __init__(self, file_obj):
         self.file_obj = file_obj
@@ -44,8 +41,6 @@ class hex_file:
         self.file_obj.seek(offset)
         self.file_obj.write(value)
         print(f"Write String at offset {offset}: {value}")
-
-
 
 # Implementasi string_shortener function
 def string_shortener(s):
@@ -330,36 +325,36 @@ class YOBJReader:
 
         print(f'OBJ and MTL files exported to {output_dir}')
 
-    def batch_export_as_one_obj(input_folder):
-        files = [f for f in os.listdir(input_folder) if f.lower().endswith('.yobj')]
-        if not files:
-            messagebox.showinfo("Info", "Tidak ada file YOBJ ditemukan di folder yang dipilih.")
-            return
+    def batch_export_as_one_obj(self, input_folder):
+        # Gunakan os.walk untuk mendapatkan semua folder, subfolder, dan file di dalamnya
+        for root, dirs, files in os.walk(input_folder):
+            yobj_files = [f for f in files if f.lower().endswith('.yobj')]
+            if not yobj_files:
+                continue  # Skip folder jika tidak ada file .yobj
 
-        for file_name in files:
-            file_path = os.path.join(input_folder, file_name)
-            yobj_reader = YOBJReader(file_path)
-            yobj_reader.export_as_one_obj()
+            for file_name in yobj_files:
+                file_path = os.path.join(root, file_name)
+                yobj_reader = YOBJReader(file_path)
+                yobj_reader.export_as_one_obj(output_dir=root)  # Simpan hasil di folder yang sama
 
-        messagebox.showinfo("Sukses", "Semua file YOBJ telah diekspor ke format OBJ dan MTL.")
+        messagebox.showinfo("Sukses", "Semua file YOBJ dan subfolder telah diekspor ke format OBJ dan MTL.")
+
 
     def inject_obj(self, mesh_id, filename):
         obj_file = OBJ(filename)
         vertex_list = obj_file.vertex
-        uv_list = obj_file.uv
         normal_list = obj_file.normal
-        face_list = obj_file.face
+        face_list = obj_file.face  # Pastikan face tidak berubah
         offset = self.offset_to_vertex_data[mesh_id]
-        uv_offset = self.offset_to_uv_data[mesh_id]
         block_size = self.mesh_blocksize[mesh_id]
 
         if len(vertex_list) != self.n_vertices_of_mesh[mesh_id]:
-            raise AssertionError('This function only supports injecting obj with the same amount of vertices')
+            raise AssertionError("This function only supports injecting OBJ with the same amount of vertices")
 
         # Inject vertex data
         for x in range(self.n_vertices_of_mesh[mesh_id]):
             vertex_x, vertex_y, vertex_z = rotate_3d_x(vertex_list[x][0], vertex_list[x][2], -vertex_list[x][1], -180)
-            vertex_offset = offset + 12
+            vertex_offset = offset + 12  # Pastikan offset tetap akurat
             data_v_x = self.file.float_to_string(vertex_x, 4)
             data_v_y = self.file.float_to_string(vertex_y, 4)
             data_v_z = self.file.float_to_string(vertex_z, 4)
@@ -368,24 +363,15 @@ class YOBJReader:
             self.file.write_string(vertex_offset + 8, data_v_z)
             offset += block_size
 
-        # Inject UV data
-        for x in range(self.n_vertices_of_mesh[mesh_id]):
-            uv_x, uv_y = uv_list[x]
-            data_uv_x = self.file.float_to_string(uv_x, 4)
-            data_uv_y = self.file.float_to_string(uv_y, 4)
-            self.file.write_string(uv_offset, data_uv_x)
-            self.file.write_string(uv_offset + 4, data_uv_y)
-            uv_offset += block_size
+        # UV tidak disentuh, pastikan tidak diubah
+        # Jika masih rusak, cek apakah face_list tetap sama setelah inject
 
         self.file.file_obj.flush()
 
 
+
     def get_object_count(self):
         return self.n_mesh
-# Class YOBJ_GUI
-import os
-import tkinter as tk
-from tkinter import filedialog, messagebox
 
 class YOBJ_GUI:
     def __init__(self, root):
@@ -415,17 +401,19 @@ class YOBJ_GUI:
             self.batch_import_obj_to_yobj(folder_selected)
 
     def batch_export_as_one_obj(self, input_folder):
-        files = [f for f in os.listdir(input_folder) if f.lower().endswith('.yobj')]
-        if not files:
-            messagebox.showinfo("Info", "Tidak ada file YOBJ ditemukan di folder yang dipilih.")
-            return
+        # Gunakan os.walk untuk mendapatkan semua folder, subfolder, dan file di dalamnya
+        for root, dirs, files in os.walk(input_folder):
+            yobj_files = [f for f in files if f.lower().endswith('.yobj')]
+            if not yobj_files:
+                continue  # Skip folder jika tidak ada file .yobj
 
-        for file_name in files:
-            file_path = os.path.join(input_folder, file_name)
-            yobj_reader = YOBJReader(file_path)
-            yobj_reader.export_as_one_obj(output_dir=input_folder)
+            for file_name in yobj_files:
+                file_path = os.path.join(root, file_name)
+                yobj_reader = YOBJReader(file_path)
+                yobj_reader.export_as_one_obj(output_dir=root)  # Simpan hasil di folder yang sama
 
-        messagebox.showinfo("Sukses", "Semua file YOBJ telah diekspor ke format OBJ dan MTL.")
+        messagebox.showinfo("Sukses", "Semua file YOBJ dan subfolder telah diekspor ke format OBJ dan MTL.")
+
 
     def batch_import_obj_to_yobj(self, input_folder):
         yobj_files = [f for f in os.listdir(input_folder) if f.lower().endswith('.yobj')]
